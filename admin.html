@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Admin — Calibração 360</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/pannellum@2.5.6/build/pannellum.css"/>
+  <style>
+    body{margin:0;font-family:Arial;background:#0b0b0b;color:#fff}
+    header{display:flex;gap:10px;align-items:center;padding:10px 12px;background:#111;position:sticky;top:0}
+    header b{font-size:14px}
+    main{display:grid;grid-template-columns:340px 1fr;min-height:calc(100vh - 52px)}
+    @media (max-width: 900px){ main{grid-template-columns:1fr; grid-template-rows: 320px 1fr;} }
+    .panel{border-right:1px solid #222;padding:12px}
+    .row{margin:10px 0}
+    label{display:block;font-size:12px;opacity:.9;margin-bottom:6px}
+    input,select,button{width:100%;padding:10px;border-radius:10px;border:1px solid #333;background:#121212;color:#fff}
+    button{cursor:pointer}
+    .btn{background:#1f6feb;border:0}
+    .btn2{background:#222;border:1px solid #333}
+    #pano{width:100%;height:100%}
+    .hint{font-size:12px;opacity:.8;line-height:1.35}
+    .ok{color:#7CFF8C}
+    .warn{color:#ffd27c}
+    .topline{display:flex;gap:10px;align-items:center}
+    .topline > *{flex:1}
+  </style>
+</head>
+<body>
+
+<header>
+  <b>Admin — Calibração 360</b>
+  <span id="status" class="hint"></span>
+</header>
+
+<main>
+  <div class="panel">
+    <div class="row">
+      <label>Senha do Admin</label>
+      <input id="pwd" type="password" placeholder="Digite a senha"/>
+    </div>
+    <div class="row">
+      <button class="btn" id="btnLogin">Entrar</button>
+      <div class="hint warn" style="margin-top:8px">
+        Aviso: isso é só uma “trava visual” (GitHub Pages não tem login real).
+      </div>
+    </div>
+
+    <hr style="border:0;border-top:1px solid #222;margin:14px 0">
+
+    <div id="adminUI" style="display:none">
+      <div class="row">
+        <label>Foto</label>
+        <select id="fotoSel"></select>
+      </div>
+
+      <div class="row topline">
+        <div>
+          <label>Yaw offset (graus)</label>
+          <input id="yawOff" type="number" step="1" value="0">
+        </div>
+        <div>
+          <label>Pitch offset (graus)</label>
+          <input id="pitchOff" type="number" step="1" value="0">
+        </div>
+      </div>
+
+      <div class="row">
+        <label>Altura da câmera (m)</label>
+        <input id="altura" type="number" step="0.1" value="1.6">
+      </div>
+
+      <div class="row">
+        <button class="btn2" id="btnAplicar">Aplicar na visualização</button>
+      </div>
+
+      <div class="row">
+        <button class="btn" id="btnSalvar">Salvar calibragem desta foto</button>
+      </div>
+
+      <div class="row">
+        <button class="btn2" id="btnBaixar">Baixar calibracoes.json</button>
+      </div>
+
+      <div class="hint" style="margin-top:10px">
+        O arquivo gerado você faz upload/commit no repo, na raiz, com o nome <b>calibracoes.json</b>.
+      </div>
+    </div>
+  </div>
+
+  <div id="pano"></div>
+</main>
+
+<script src="https://unpkg.com/pannellum@2.5.6/build/pannellum.js"></script>
+
+<script>
+  // ====== CONFIG (IGUAL AO SEU INDEX) ======
+  const GITHUB_OWNER = "marcospsbio";
+  const GITHUB_REPO  = "foto360";
+  const BRANCH       = "main";
+  const FOTOS_DIR    = "fotos";
+
+  // senha (NÃO segura, só trava visual)
+  const ADMIN_PASSWORD = "1234";
+
+  const statusEl = document.getElementById("status");
+  const adminUI  = document.getElementById("adminUI");
+  const pwdEl    = document.getElementById("pwd");
+  const fotoSel  = document.getElementById("fotoSel");
+
+  const yawOffEl   = document.getElementById("yawOff");
+  const pitchOffEl = document.getElementById("pitchOff");
+  const alturaEl   = document.getElementById("altura");
+
+  let viewer = null;
+  let fotos = [];
+  let calibracoes = {}; // { "NOME.jpg": { yawOff, pitchOff, altura } }
+
+  function setStatus(t){ statusEl.textContent = t; }
+
+  async function listFotos(){
+    const api = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FOTOS_DIR}?ref=${BRANCH}`;
+    const r = await fetch(api, { cache:"no-store" });
+    if(!r.ok) throw new Error("API GitHub falhou HTTP " + r.status);
+    const items = await r.json();
+    return items
+      .filter(it => it.type==="file" && /\.(jpg|jpeg|png|webp)$/i.test(it.name))
+      .sort((a,b)=> a.name.localeCompare(b.name, "pt-BR", {numeric:true, sensitivity:"base"}))
+      .map(it => ({ name: it.name, url: it.download_url }));
+  }
+
+  function loadFoto(name){
+    const f = fotos.find(x=>x.name===name);
+    if(!f) return;
+
+    if(viewer){
+      try{ viewer.destroy(); }catch(e){}
+      document.getElementById("pano").innerHTML = "";
+    }
+
+    viewer = pannellum.viewer("pano", {
+      type: "equirectangular",
+      panorama: f.url,
+      autoLoad: true,
+      showZoomCtrl: true,
+      mouseZoom: true,
+      hfov: 100,
+      minHfov: 3,
+      maxHfov: 170
+    });
+
+    // aplica calibração existente, se houver
+    const c = calibracoes[name];
+    yawOffEl.value   = c?.yawOff ?? 0;
+    pitchOffEl.value = c?.pitchOff ?? 0;
+    alturaEl.value   = c?.altura ?? 1.6;
+
+    aplicarVisual();
+  }
+
+  function aplicarVisual(){
+    if(!viewer) return;
+    // aqui a “calibração” básica: ajusta yaw/pitch do ponto de vista
+    const yawOff   = Number(yawOffEl.value || 0);
+    const pitchOff = Number(pitchOffEl.value || 0);
+
+    // Pannellum: setYaw/setPitch movimenta a visão atual
+    // Vamos centralizar pelo offset:
+    viewer.setYaw(yawOff);
+    viewer.setPitch(pitchOff);
+  }
+
+  function salvarCalibracao(){
+    const name = fotoSel.value;
+    calibracoes[name] = {
+      yawOff: Number(yawOffEl.value || 0),
+      pitchOff: Number(pitchOffEl.value || 0),
+      altura: Number(alturaEl.value || 1.6),
+      updatedAt: new Date().toISOString()
+    };
+    setStatus("Salvo ✓ " + name);
+  }
+
+  function baixarJson(){
+    const blob = new Blob([JSON.stringify(calibracoes, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "calibracoes.json";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  document.getElementById("btnLogin").addEventListener("click", async ()=>{
+    if(pwdEl.value !== ADMIN_PASSWORD){
+      setStatus("Senha incorreta.");
+      return;
+    }
+    adminUI.style.display = "block";
+    setStatus("Carregando fotos…");
+
+    try{
+      fotos = await listFotos();
+      fotoSel.innerHTML = fotos.map(f => `<option value="${f.name}">${f.name}</option>`).join("");
+      setStatus(`OK ✓ ${fotos.length} foto(s).`);
+
+      // tenta carregar calibracoes.json se existir
+      try{
+        const r = await fetch("./calibracoes.json", { cache:"no-store" });
+        if(r.ok) calibracoes = await r.json();
+      }catch(e){}
+
+      loadFoto(fotoSel.value);
+    }catch(e){
+      setStatus("Erro: " + e.message);
+    }
+  });
+
+  fotoSel.addEventListener("change", ()=> loadFoto(fotoSel.value));
+  document.getElementById("btnAplicar").addEventListener("click", aplicarVisual);
+  document.getElementById("btnSalvar").addEventListener("click", salvarCalibracao);
+  document.getElementById("btnBaixar").addEventListener("click", baixarJson);
+</script>
+</body>
+</html>

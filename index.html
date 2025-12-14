@@ -2,8 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8" />
-<title>Foto 360 com Divisa</title>
-
+<title>Fotos 360 + Mapa</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -14,65 +13,118 @@
 <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
 
 <style>
-html, body {
-  margin: 0;
-  height: 100%;
-  background: #000;
-  font-family: Arial, sans-serif;
+html, body { margin:0; height:100%; font-family: Arial, sans-serif; background:#000; }
+#mapView, #photoView { width:100%; height:100%; }
+.hidden { display:none; }
+
+#map { width:100%; height:100%; }
+
+#viewer { width:100%; height:100%; position:relative; }
+
+#miniMap {
+  position:absolute;
+  left:14px;
+  bottom:14px;
+  width:160px;
+  height:110px;
+  border-radius:12px;
+  overflow:hidden;
+  border:2px solid rgba(255,255,255,.65);
+  box-shadow:0 8px 22px rgba(0,0,0,.35);
+  z-index: 9000;
+  background:#111;
+}
+@media (max-width: 600px){
+  #miniMap { width:120px; height:80px; } /* menor no celular */
 }
 
-#viewer {
-  width: 100%;
-  height: 100%;
+.topbar {
+  position:absolute;
+  left:10px;
+  top:10px;
+  display:flex;
+  gap:10px;
+  z-index: 9000;
+}
+.btn {
+  background: rgba(0,0,0,.55);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.25);
+  padding:8px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  font-size:14px;
+  backdrop-filter: blur(6px);
+}
+.badge {
+  background: rgba(0,0,0,.55);
+  color:#fff;
+  border:1px solid rgba(255,255,255,.25);
+  padding:8px 10px;
+  border-radius:12px;
+  font-size:14px;
 }
 
 .divisa-dot {
-  width: 6px;
-  height: 6px;
-  background: red;
-  border-radius: 50%;
-  box-shadow: 0 0 6px red;
+  width:6px; height:6px;
+  background:red;
+  border-radius:50%;
+  box-shadow: 0 0 8px red;
 }
 
 #debug {
-  position: fixed;
-  bottom: 10px;
-  left: 10px;
-  background: rgba(0,0,0,0.75);
-  color: #0f0;
-  padding: 6px 10px;
-  font-size: 12px;
+  position:fixed;
+  left:10px;
+  bottom:10px;
+  background: rgba(0,0,0,0.70);
+  color: #2bff2b;
+  padding:6px 10px;
+  font-size:12px;
   z-index: 9999;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 </style>
 </head>
-
 <body>
 
-<div id="viewer"></div>
-<div id="debug">Inicializando…</div>
+<div id="mapView">
+  <div id="map"></div>
+</div>
+
+<div id="photoView" class="hidden">
+  <div id="viewer"></div>
+
+  <div class="topbar">
+    <div class="badge" id="photoName">Foto</div>
+    <button class="btn" id="backBtn">Voltar ao mapa</button>
+    <button class="btn" id="fsBtn">Tela cheia</button>
+  </div>
+
+  <div id="miniMap" title="Clique para voltar ao mapa"></div>
+</div>
+
+<div id="debug">Carregando…</div>
 
 <script>
-/* ===================== CONFIG ===================== */
+/* ===== CONFIG ===== */
+const OWNER  = "marcospsbio";
+const REPO   = "fotos360";
+const BRANCH = "main";
+const FOTOS_DIR = "fotos";
 
-const FOTO = {
-  src: "fotos/DJI_0210.JPG",
-  lat: -23.000000,   // <<< ajuste se quiser
-  lng: -47.000000
-};
+const DEFAULT_CENTER = [-23.0000, -47.0000]; // fallback se nada tiver
+const DEFAULT_ZOOM = 17;
 
-/* ===================== VARIÁVEIS ===================== */
-
+/* ===== STATE ===== */
+let map, miniMap, viewer;
 let CAL = {};
 let DIVISA = null;
-let viewer;
+let divisaLayer = null;
+let photoMarkerLayer = null;
+let currentPhoto = null;
 
-/* ===================== UTIL ===================== */
-
-function logDebug(msg) {
-  document.getElementById("debug").innerText = msg;
-}
+/* ===== UTILS ===== */
+const dbg = (t) => document.getElementById("debug").innerText = t;
 
 function bearingDeg(lat1, lon1, lat2, lon2){
   const toRad = d => d * Math.PI/180;
@@ -80,79 +132,167 @@ function bearingDeg(lat1, lon1, lat2, lon2){
   const φ1 = toRad(lat1), φ2 = toRad(lat2);
   const Δλ = toRad(lon2 - lon1);
   const y = Math.sin(Δλ) * Math.cos(φ2);
-  const x = Math.cos(φ1)*Math.sin(φ2) -
-            Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+  const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
   let brng = toDeg(Math.atan2(y, x));
   return (brng + 360) % 360;
 }
-
 function bearingToYaw(bearing, yawOff){
   let yaw = bearing + (yawOff || 0);
   return ((yaw + 540) % 360) - 180;
 }
+function getCalForPhoto(photoSrc){
+  const keys = [
+    photoSrc,
+    photoSrc.replace(/^\.?\//, ""),
+    photoSrc.split("/").pop()
+  ];
+  for (const k of keys) if (CAL[k]) return CAL[k];
+  return null;
+}
 
-/* ===================== LOADERS ===================== */
+/* ===== LOADERS ===== */
+async function loadJSONNoCache(url){
+  const u = `${url}?v=${Date.now()}`;
+  const r = await fetch(u, { cache: "no-store" });
+  return await r.json();
+}
+async function loadTextNoCache(url){
+  const u = `${url}?v=${Date.now()}`;
+  const r = await fetch(u, { cache: "no-store" });
+  return await r.text();
+}
 
 async function loadCalibracoes(){
-  const url = `./calibracoes.json?v=${Date.now()}`;
-  const r = await fetch(url, { cache: "no-store" });
-  CAL = await r.json();
+  try {
+    CAL = await loadJSONNoCache("./calibracoes.json");
+  } catch(e){
+    CAL = {};
+  }
 }
 
 async function loadDivisa(){
-  const r = await fetch(`./property.kml?v=${Date.now()}`, { cache: "no-store" });
-  const txt = await r.text();
+  const txt = await loadTextNoCache("./property.kml");
   const xml = new DOMParser().parseFromString(txt, "text/xml");
   DIVISA = toGeoJSON.kml(xml);
 }
 
-/* ===================== DIVISA ===================== */
+async function listFotosViaGitHubAPI(){
+  // API pública do GitHub: lista arquivos em /fotos
+  const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FOTOS_DIR}?ref=${BRANCH}&v=${Date.now()}`;
+  const r = await fetch(url, { cache:"no-store" });
+  if (!r.ok) throw new Error("GitHub API " + r.status);
+  const arr = await r.json();
+  return arr
+    .filter(x => x.type === "file" && /\.(jpe?g|png)$/i.test(x.name))
+    .map(x => ({
+      name: x.name,
+      src: `${FOTOS_DIR}/${x.name}`
+    }));
+}
 
-function addDivisaHotspots() {
-
-  const keys = [
-    FOTO.src,
-    FOTO.src.replace(/^\.?\//, ""),
-    FOTO.src.split("/").pop()
-  ];
-
-  let cal = {};
-  for (const k of keys) {
-    if (CAL[k]) { cal = CAL[k]; break; }
-  }
-
-  logDebug(
-    Object.keys(cal).length
-      ? "Calibração encontrada ✔"
-      : "⚠️ Calibração NÃO encontrada"
+/* ===== MAP LAYERS ===== */
+function satelliteLayer(){
+  // Esri World Imagery (satélite)
+  return L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    { maxZoom: 20 }
   );
+}
 
-  const yawOff = cal.yawOffset || 0;
-  const pitchOff = cal.pitchOffset || -6;
+function drawDivisaOnMap(targetMap){
+  if (!DIVISA) return null;
+  const layer = L.geoJSON(DIVISA, {
+    style: {
+      color: "#2b83ff",
+      weight: 3,
+      fillOpacity: 0.12
+    }
+  }).addTo(targetMap);
+  return layer;
+}
 
-  // hotspot de teste (SEMPRE aparece)
-  viewer.addHotSpot({
-    pitch: 0,
-    yaw: 0,
-    cssClass: "divisa-dot"
-  });
-
-  if (!DIVISA) return;
-
-  let coords = [];
-
+function getDivisaCenter(){
+  if (!DIVISA) return DEFAULT_CENTER;
+  // pega o primeiro polígono
   for (const f of DIVISA.features) {
-    if (f.geometry?.type === "Polygon") {
-      coords = f.geometry.coordinates[0];
-      break;
+    if (f.geometry && f.geometry.type === "Polygon") {
+      const coords = f.geometry.coordinates[0];
+      let sumLat=0, sumLng=0, n=0;
+      coords.forEach(p => { sumLng += p[0]; sumLat += p[1]; n++; });
+      return [sumLat/n, sumLng/n];
     }
   }
+  return DEFAULT_CENTER;
+}
 
+/* ===== PHOTO VIEW ===== */
+function showMap(){
+  document.getElementById("photoView").classList.add("hidden");
+  document.getElementById("mapView").classList.remove("hidden");
+  if (map) map.invalidateSize();
+  dbg("Mapa");
+}
+
+function showPhoto(photo){
+  currentPhoto = photo;
+  document.getElementById("mapView").classList.add("hidden");
+  document.getElementById("photoView").classList.remove("hidden");
+
+  document.getElementById("photoName").innerText = photo.name;
+
+  // recria viewer
+  document.getElementById("viewer").innerHTML = "";
+  viewer = pannellum.viewer("viewer", {
+    type: "equirectangular",
+    panorama: photo.src,
+    autoLoad: true,
+    showZoomCtrl: true,
+    showFullscreenCtrl: true
+  });
+
+  viewer.on("load", () => {
+    applyDivisaOverlay(photo);
+  });
+
+  // minimapa
+  miniMap.setView(photo.latlng || getDivisaCenter(), 18);
+  miniMap.eachLayer(l => {
+    // mantém apenas tiles; remove vetores antigos
+    if (l instanceof L.GeoJSON || l instanceof L.Marker) miniMap.removeLayer(l);
+  });
+  drawDivisaOnMap(miniMap);
+
+  if (photo.latlng) {
+    L.marker(photo.latlng).addTo(miniMap);
+  }
+
+  dbg("Foto aberta. (mini-mapa: clique para voltar)");
+}
+
+/* ===== OVERLAY NA FOTO ===== */
+function applyDivisaOverlay(photo){
+  const cal = getCalForPhoto(photo.src);
+  if (cal) dbg("Calibração encontrada ✓");
+  else dbg("⚠️ Calibração NÃO encontrada (vai desenhar mesmo assim)");
+
+  const yawOff = cal?.yawOffset || 0;
+  const pitchOff = cal?.pitchOffset ?? -6;
+
+  // hotspot de teste (sempre)
+  viewer.addHotSpot({ pitch: 0, yaw: 0, cssClass: "divisa-dot" });
+
+  if (!DIVISA || !photo.latlng) return;
+
+  let coords = [];
+  for (const f of DIVISA.features) {
+    if (f.geometry?.type === "Polygon") { coords = f.geometry.coordinates[0]; break; }
+  }
+
+  const lat1 = photo.latlng[0], lon1 = photo.latlng[1];
   coords.forEach((p, i) => {
     const lon2 = p[0], lat2 = p[1];
-    const brng = bearingDeg(FOTO.lat, FOTO.lng, lat2, lon2);
+    const brng = bearingDeg(lat1, lon1, lat2, lon2);
     const yaw = bearingToYaw(brng, yawOff);
-
     viewer.addHotSpot({
       id: "divisa_" + i,
       pitch: pitchOff,
@@ -162,24 +302,80 @@ function addDivisaHotspots() {
   });
 }
 
-/* ===================== INIT ===================== */
-
-async function init() {
-
+/* ===== INIT ===== */
+async function init(){
+  dbg("Carregando divisa + calibracoes...");
   await loadCalibracoes();
   await loadDivisa();
 
-  viewer = pannellum.viewer('viewer', {
-    type: 'equirectangular',
-    panorama: FOTO.src,
-    autoLoad: true,
-    showZoomCtrl: true,
-    showFullscreenCtrl: true
+  // Mapa principal
+  map = L.map("map", { zoomControl: true });
+  satelliteLayer().addTo(map);
+  divisaLayer = drawDivisaOnMap(map);
+
+  const center = getDivisaCenter();
+  map.setView(center, DEFAULT_ZOOM);
+
+  // Mini mapa
+  miniMap = L.map("miniMap", { zoomControl: false, attributionControl: false, dragging: true, scrollWheelZoom: true });
+  satelliteLayer().addTo(miniMap);
+  drawDivisaOnMap(miniMap);
+  miniMap.setView(center, 18);
+  document.getElementById("miniMap").addEventListener("click", showMap);
+
+  // Lista fotos
+  dbg("Carregando fotos...");
+  let fotos = [];
+  try {
+    fotos = await listFotosViaGitHubAPI();
+  } catch(e){
+    dbg("⚠️ Não consegui listar fotos via GitHub API. Verifique OWNER/REPO/BRANCH/FOTOS_DIR.");
+    fotos = [];
+  }
+
+  // Camada de marcadores (1 pino central provisório; depois você coloca EXIF)
+  photoMarkerLayer = L.layerGroup().addTo(map);
+
+  // Se ainda não tem EXIF, coloca o marcador no centro da divisa
+  const fallbackLatLng = center;
+
+  fotos.forEach(f => {
+    // por enquanto usa centro da divisa (até você extrair EXIF e salvar lat/lng por foto)
+    f.latlng = fallbackLatLng;
+
+    const iconHtml = `
+      <div style="
+        width:34px;height:34px;border-radius:50%;
+        background:rgba(0,0,0,.55);
+        border:2px solid #fff;
+        display:flex;align-items:center;justify-content:center;
+        box-shadow:0 8px 18px rgba(0,0,0,.35);
+      ">
+        <div style="
+          width:18px;height:18px;border-radius:4px;
+          background:#2b83ff;
+          clip-path: polygon(50% 0%, 100% 40%, 80% 100%, 20% 100%, 0% 40%);
+        "></div>
+      </div>
+    `;
+
+    const icon = L.divIcon({
+      html: iconHtml,
+      className: "",
+      iconSize: [34, 34],
+      iconAnchor: [17, 17]
+    });
+
+    const m = L.marker(f.latlng, { icon }).addTo(photoMarkerLayer);
+    m.bindTooltip("📷 360: " + f.name, { direction: "top", offset: [0, -10] });
+    m.on("click", () => showPhoto(f));
   });
 
-  viewer.on('load', () => {
-    addDivisaHotspots();
-  });
+  // UI
+  document.getElementById("backBtn").addEventListener("click", showMap);
+  document.getElementById("fsBtn").addEventListener("click", () => viewer?.toggleFullscreen?.());
+
+  dbg("OK. Clique no ícone 📷 360 no mapa.");
 }
 
 init();

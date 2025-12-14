@@ -15,122 +15,182 @@
     html, body { height: 100%; margin: 0; background:#000; font-family: Arial, sans-serif; }
     #map { height: 100vh; width: 100vw; }
 
+    /* Overlay do 360 */
     #viewerOverlay { position: fixed; inset: 0; background: #000; display: none; z-index: 9999; }
     #panorama { width: 100%; height: 100%; }
 
+    /* Mini mapa dentro do 360 */
     #miniMap {
-      position: absolute; left: 14px; bottom: 14px;
-      width: 110px; height: 75px;
-      border-radius: 12px; overflow: hidden;
-      border: 2px solid rgba(255,255,255,0.25);
-      box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      width: 110px;         /* ~1/4 do antigo */
+      height: 75px;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.22);
+      box-shadow: 0 8px 26px rgba(0,0,0,0.45);
       cursor: pointer;
+      z-index: 10001;
     }
-    #miniHint {
-      position: absolute; left: 14px; bottom: 95px;
-      padding: 8px 10px; background: rgba(0,0,0,0.55);
-      color: #fff; border-radius: 10px; font-size: 12px;
-      user-select: none;
+    @media (max-width: 900px){
+      #miniMap { width: 90px; height: 60px; left: 10px; bottom: 10px; }
     }
 
+    #miniHint {
+      position: absolute;
+      left: 12px;
+      bottom: 94px;
+      padding: 7px 9px;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      border-radius: 10px;
+      font-size: 11px;
+      user-select: none;
+      z-index: 10001;
+    }
+    @media (max-width: 900px){
+      #miniHint { left: 10px; bottom: 78px; font-size: 10px; }
+    }
+
+    /* Barra superior no 360 */
     #topBar {
-      position: absolute; top: 12px; left: 12px; right: 12px;
-      display: flex; gap: 10px; align-items: center;
-      z-index: 10000; pointer-events: none;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      right: 10px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      z-index: 10002;
+      pointer-events: none;
+      flex-wrap: wrap;
     }
     .pill {
       pointer-events: auto;
-      background: rgba(0,0,0,0.55); color: #fff;
-      padding: 10px 12px; border-radius: 999px; font-size: 14px;
-      display: inline-flex; gap: 8px; align-items: center;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      padding: 9px 11px;
+      border-radius: 999px;
+      font-size: 13px;
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
     }
     .btn {
       pointer-events: auto;
-      border: 0; border-radius: 999px;
-      padding: 10px 12px;
-      background: rgba(255,255,255,0.10); color: #fff;
+      border: 0;
+      border-radius: 999px;
+      padding: 9px 11px;
+      background: rgba(255,255,255,0.10);
+      color: #fff;
       cursor: pointer;
     }
     .btn:hover { background: rgba(255,255,255,0.16); }
 
+    /* Mini galeria */
     #thumbs {
-      position: absolute; right: 14px; bottom: 14px;
-      display: flex; flex-direction: column; gap: 8px;
-      z-index: 10000; max-height: 55vh; overflow: auto; padding-right: 4px;
+      position: absolute;
+      right: 12px;
+      bottom: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 10002;
+      max-height: 55vh;
+      overflow: auto;
+      padding-right: 4px;
     }
     .thumb {
       width: 64px; height: 64px;
-      border-radius: 12px; overflow: hidden;
+      border-radius: 12px;
+      overflow: hidden;
       border: 2px solid rgba(255,255,255,0.18);
-      cursor: pointer; background: rgba(255,255,255,0.06);
+      cursor: pointer;
+      background: rgba(255,255,255,0.06);
     }
     .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .thumb.active { border-color: rgba(255,255,255,0.8); }
+    .thumb.active { border-color: rgba(255,255,255,0.85); }
 
+    /* Status / erro */
     #status {
-      position: fixed; top: 12px; left: 12px;
-      background: rgba(0,0,0,0.55); color: #fff;
-      padding: 10px 12px; border-radius: 12px; font-size: 13px;
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
       z-index: 12000;
+      max-width: calc(100vw - 24px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
-
     #err {
       position: fixed; left: 12px; bottom: 12px; right: 12px;
       background: rgba(0,0,0,0.7); color: #fff;
       padding: 10px 12px; border-radius: 10px;
       display: none; z-index: 20000; font-size: 13px;
     }
-  
-    @media (max-width: 900px) {
-      #miniMap { width: 90px; height: 60px; left: 10px; bottom: 10px; border-radius: 10px; }
-      #miniHint { left: 10px; bottom: 78px; font-size: 11px; padding: 6px 8px; border-radius: 10px; }
-    }
 
-  
-    .foto360-pin{
-      width: 34px; height: 34px;
+    /* Marker "Foto 360" */
+    .marker360 {
+      width: 44px;
+      height: 44px;
+      transform: translate(-22px,-44px);
+      display: grid;
+      place-items: center;
+      pointer-events: auto;
+    }
+    .marker360 .pin {
+      width: 38px; height: 38px;
       border-radius: 999px;
-      background: rgba(255,255,255,0.95);
-      border: 2px solid rgba(0,0,0,0.25);
-      display:flex; align-items:center; justify-content:center;
-      box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+      background: rgba(0,0,0,0.70);
+      border: 2px solid rgba(255,255,255,0.30);
+      box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+      display: grid;
+      place-items: center;
       position: relative;
     }
-    .foto360-pin::after{
-      content:"";
-      position:absolute;
-      left:50%; transform: translateX(-50%) rotate(45deg);
-      bottom:-6px;
-      width: 10px; height: 10px;
-      background: rgba(255,255,255,0.95);
-      border-right: 2px solid rgba(0,0,0,0.18);
-      border-bottom: 2px solid rgba(0,0,0,0.18);
-      box-shadow: 4px 4px 10px rgba(0,0,0,0.12);
+    .marker360 .pin::after{
+      content: "";
+      position: absolute;
+      bottom: -9px;
+      width: 0; height: 0;
+      border-left: 7px solid transparent;
+      border-right: 7px solid transparent;
+      border-top: 10px solid rgba(0,0,0,0.70);
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
     }
-    .foto360-cam{ font-size: 16px; line-height: 1; }
-    .foto360-badge{
-      position:absolute; top:-8px; right:-8px;
-      background: #1e88e5;
-      color:#fff;
-      font-weight:700;
-      font-size:10px;
+    .marker360 .cam {
+      font-size: 18px;
+      line-height: 1;
+      margin-top: 1px;
+    }
+    .marker360 .badge {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      font-size: 10px;
       padding: 3px 6px;
       border-radius: 999px;
-      border: 2px solid rgba(255,255,255,0.9);
-      box-shadow: 0 6px 14px rgba(0,0,0,0.18);
-    }
-    @media (max-width: 900px){
-      .foto360-pin{ width: 30px; height: 30px; }
-      .foto360-cam{ font-size: 14px; }
-      .foto360-badge{ font-size:9px; padding: 2px 5px; top:-7px; right:-7px; }
+      background: rgba(255,255,255,0.92);
+      color: #000;
+      font-weight: 700;
+      border: 1px solid rgba(0,0,0,0.15);
     }
 
-  
-    @media (max-width: 900px){
-      #miniMap{ width: 90px; height: 60px; }
-      #miniHint{ bottom: 80px; font-size: 11px; }
+    /* “Divisa” dentro do pano (hotspots pontinhos) */
+    .divisa-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255,0,0,0.92);
+      box-shadow: 0 0 10px rgba(255,0,0,0.85);
+      border: 1px solid rgba(255,255,255,0.25);
     }
-
   </style>
 </head>
 <body>
@@ -146,34 +206,37 @@
     <button class="btn" id="btnFullscreen">Tela cheia</button>
   </div>
 
-  <div id="miniHint">Clique no mini-mapa para voltar ao mapa</div>
+  <div id="miniHint">Toque no mini‑mapa para voltar</div>
   <div id="miniMap" title="Clique para voltar ao mapa"></div>
 
   <div id="thumbs"></div>
 </div>
 
-<div id="status">Carregando fotos…</div>
+<div id="status">Carregando…</div>
 <div id="err"></div>
 
+<!-- libs -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/pannellum@2.5.6/build/pannellum.js"></script>
 
 <!-- EXIF no navegador (GPS etc.) -->
 <script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
 
-<!-- KML -> GeoJSON (opcional) -->
+<!-- KML -> GeoJSON -->
 <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
 
 <script>
   // ================== CONFIG ==================
-  const GITHUB_OWNER = "marcospsbio"; // <- ajuste
-  const GITHUB_REPO  = "foto360";    // <- ajuste
+  const GITHUB_OWNER = "marcospsbio";
+  const GITHUB_REPO  = "foto360";
   const BRANCH       = "main";
-  const FOTOS_DIR    = "fotos";       // pasta onde você joga as fotos
+  const FOTOS_DIR    = "fotos";
 
-  // KML dos limites (opcional). Se não tiver, deixe null.
+  // arquivos opcionais na raiz do repo:
+  // - property.kml (limites)
+  // - calibracoes.json (offset por foto: yawOff/pitchOff/altura)
   const KML_URL = "./property.kml";
-  const USA_KML = true; // mude para false se não quiser limites
+  const CAL_URL = "./calibracoes.json";
 
   // ================== UI helpers ==================
   const errBox = document.getElementById("err");
@@ -186,46 +249,55 @@
   }
   function setStatus(msg){ statusBox.textContent = msg; }
   function hideStatus(){ statusBox.style.display = "none"; }
-
   function isMobile(){ return matchMedia("(max-width: 900px)").matches; }
 
-  // ================== MAPA ==================
+  // ================== MAPA PRINCIPAL ==================
   const map = L.map("map", { zoomControl: true });
 
-  const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  // Base layers
+  const osmMain = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 20, attribution: "&copy; OpenStreetMap"
   });
 
-  const esriSat = L.tileLayer(
+  const esriSatMain = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     { maxZoom: 20, attribution: "Tiles &copy; Esri" }
-  ).addTo(map);
+  );
+
+  // Inicia já no satélite
+  esriSatMain.addTo(map);
 
   L.control.layers(
-    { "Mapa": osm, "Satélite": esriSat },
+    { "Satélite": esriSatMain, "Mapa": osmMain },
     {},
     { position: "topright" }
   ).addTo(map);
 
   const limitesLayer = L.geoJSON(null, {
-    style: { weight: 3, opacity: 0.9, fillOpacity: 0.05 }
+    style: { weight: 3, opacity: 0.95, fillOpacity: 0.05 }
   }).addTo(map);
 
   const markersLayer = L.layerGroup().addTo(map);
 
-  // ================== MINI MAPA ==================
+  // ================== MINI MAPA (também satélite) ==================
   const miniMap = L.map("miniMap", {
-    zoomControl: false, attributionControl: false,
-    dragging: false, scrollWheelZoom: false,
-    doubleClickZoom: false, boxZoom: false,
-    keyboard: false, tap: false
+    zoomControl: false,
+    attributionControl: false,
+    dragging: false,
+    scrollWheelZoom: false,
+    doubleClickZoom: false,
+    boxZoom: false,
+    keyboard: false,
+    tap: false
   });
+
   const esriSatMini = L.tileLayer(
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
     { maxZoom: 20, attribution: "Tiles &copy; Esri" }
   ).addTo(miniMap);
+
   const miniLimitesLayer = L.geoJSON(null, {
-    style: { weight: 2, opacity: 0.9, fillOpacity: 0.05 }
+    style: { weight: 2, opacity: 0.95, fillOpacity: 0.05 }
   }).addTo(miniMap);
 
   let miniMarker = null;
@@ -239,13 +311,20 @@
 
   let viewer = null;
   let currentFotoId = null;
-  let FOTOS = []; // vai ser preenchido automaticamente
+
+  // fotos montadas automaticamente
+  let FOTOS = [];
+
+  // divisa / calibração
+  let DIVISA = null; // GeoJSON
+  let CAL = {};      // { "arquivo.jpg": {yawOff, pitchOff, altura, ...} }
 
   function openViewer(foto){
     currentFotoId = foto.id;
-    viewerTitle.textContent = foto.titulo || foto.id;
+    viewerTitle.textContent = "📷 360 • " + (foto.titulo || foto.id);
     overlay.style.display = "block";
 
+    // (Re)cria o viewer
     if (viewer) {
       try { viewer.destroy(); } catch(e) {}
       viewer = null;
@@ -254,30 +333,39 @@
 
     const hfovInicial = foto.hfov ?? (isMobile() ? 105 : 100);
 
-    viewer = pannellum.viewer("panorama", {
-      type: "equirectangular",
+    viewer = pannellum.viewer('panorama', {
+      type: 'equirectangular',
       panorama: foto.url,
       autoLoad: true,
       showZoomCtrl: true,
       showFullscreenCtrl: false,
       mouseZoom: true,
 
-      // zoom liberado forte (mobile)
+      // zoom bem livre (mobile)
       hfov: hfovInicial,
       minHfov: 3,
       maxHfov: 170,
 
-      yaw: foto.yaw || 0,
-      pitch: foto.pitch || 0
+      yaw: 0,
+      pitch: 0
     });
 
+    // aplica calibração (se existir)
+    applyCalibracao(viewer, foto);
+
+    // adiciona divisa sobre o pano (pontos)
+    addDivisaHotspots(viewer, foto);
+
+    // Atualiza mini-mapa e thumbs
     updateMiniMap(foto);
     renderThumbs();
   }
 
-  function closeViewer(){ overlay.style.display = "none"; }
+  function closeViewer(){
+    overlay.style.display = "none";
+  }
+
   btnClose.addEventListener("click", closeViewer);
-  document.getElementById("miniMap").addEventListener("click", closeViewer);
 
   btnFullscreen.addEventListener("click", () => {
     const el = overlay;
@@ -285,10 +373,19 @@
     else document.exitFullscreen?.();
   });
 
+  document.getElementById("miniMap").addEventListener("click", closeViewer);
+
   function updateMiniMap(foto){
-    if (miniMarker) miniMap.removeLayer(miniMarker);
+    if (miniMarker) {
+      miniMap.removeLayer(miniMarker);
+      miniMarker = null;
+    }
+
     miniMarker = L.circleMarker([foto.lat, foto.lng], {
-      radius: 7, weight: 2, opacity: 1, fillOpacity: 0.9
+      radius: 6,
+      weight: 2,
+      opacity: 1,
+      fillOpacity: 0.9
     }).addTo(miniMap);
 
     const bounds = miniLimitesLayer.getBounds();
@@ -314,23 +411,157 @@
     });
   }
 
-  // ================== KML (opcional) ==================
+  // ================== KML (limites) ==================
   async function loadKml(){
-    if (!USA_KML) return;
     try{
       const resp = await fetch(KML_URL, { cache: "no-store" });
-      if (!resp.ok) throw new Error("Não consegui baixar o KML (HTTP " + resp.status + ")");
+      if (!resp.ok) throw new Error("Não consegui baixar property.kml (HTTP " + resp.status + ")");
       const text = await resp.text();
-      const xml = new DOMParser().parseFromString(text, "text/xml");
-      const gj = toGeoJSON.kml(xml);
+      const parser = new DOMParser();
+      const xml = parser.parseFromString(text, "text/xml");
 
-      limitesLayer.clearLayers(); limitesLayer.addData(gj);
-      miniLimitesLayer.clearLayers(); miniLimitesLayer.addData(gj);
+      DIVISA = toGeoJSON.kml(xml); // guarda para uso no 360
+
+      limitesLayer.clearLayers();
+      limitesLayer.addData(DIVISA);
+
+      miniLimitesLayer.clearLayers();
+      miniLimitesLayer.addData(DIVISA);
 
       const b = limitesLayer.getBounds();
       if (b.isValid()) map.fitBounds(b.pad(0.15));
     } catch(e){
+      DIVISA = null;
       showErr("KML: " + e.message);
+    }
+  }
+
+  // ================== Calibrações ==================
+  async function loadCalibracoes(){
+    try{
+      const r = await fetch(CAL_URL, { cache: "no-store" });
+      if (r.ok) CAL = await r.json();
+    } catch(e){
+      CAL = {};
+    }
+  }
+
+  function applyCalibracao(viewer, foto){
+    // chave principal: nome do arquivo (foto.titulo)
+    const key = (foto.titulo || "").trim();
+    const c = (CAL && key && CAL[key]) ? CAL[key] : null;
+    if (!c) return;
+
+    const yawOff = Number(c.yawOff || 0);
+    const pitchOff = Number(c.pitchOff || 0);
+    // altura existe mas, nesta versão simples, não entra no cálculo do pitch real do KML
+    viewer.setYaw(yawOff);
+    viewer.setPitch(pitchOff);
+  }
+
+  // ================== Overlay da divisa no 360 ==================
+  function bearingDeg(lat1, lon1, lat2, lon2){
+    const toRad = d => d * Math.PI/180;
+    const toDeg = r => r * 180/Math.PI;
+    const φ1 = toRad(lat1), φ2 = toRad(lat2);
+    const Δλ = toRad(lon2 - lon1);
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
+    let brng = toDeg(Math.atan2(y, x));
+    brng = (brng + 360) % 360;
+    return brng;
+  }
+
+  function normalizeYaw(yaw){
+    // [-180..180]
+    return ((yaw + 540) % 360) - 180;
+  }
+
+  function bearingToYaw(bearing, yawOff){
+    // yawOff é o ajuste manual (admin) para "alinhar" o norte do pano
+    return normalizeYaw(bearing + (yawOff || 0));
+  }
+
+  function haversineMeters(lat1, lon1, lat2, lon2){
+    const R = 6371000;
+    const toRad = d => d*Math.PI/180;
+    const φ1=toRad(lat1), φ2=toRad(lat2);
+    const dφ=toRad(lat2-lat1), dλ=toRad(lon2-lon1);
+    const a = Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2;
+    return 2*R*Math.asin(Math.sqrt(a));
+  }
+
+  function densifyLine(latlngs, stepMeters){
+    // latlngs: [[lat,lng], ...]
+    if (latlngs.length < 2) return latlngs;
+    const out = [latlngs[0]];
+    for (let i=0;i<latlngs.length-1;i++){
+      const [lat1, lon1] = latlngs[i];
+      const [lat2, lon2] = latlngs[i+1];
+      const dist = haversineMeters(lat1, lon1, lat2, lon2);
+      const n = Math.max(1, Math.floor(dist / stepMeters));
+      for (let k=1;k<=n;k++){
+        const t = k / n;
+        out.push([lat1 + (lat2-lat1)*t, lon1 + (lon2-lon1)*t]);
+      }
+    }
+    return out;
+  }
+
+  function extractDivisaCoords(divisaGeoJson){
+    if (!divisaGeoJson || !divisaGeoJson.features) return [];
+    for (const f of divisaGeoJson.features){
+      const g = f.geometry;
+      if (!g) continue;
+      if (g.type === "Polygon" && g.coordinates?.[0]?.length){
+        // anel externo: [[lon,lat],...]
+        return g.coordinates[0].map(p => [p[1], p[0]]);
+      }
+      if (g.type === "MultiPolygon" && g.coordinates?.[0]?.[0]?.length){
+        return g.coordinates[0][0].map(p => [p[1], p[0]]);
+      }
+      if (g.type === "LineString" && g.coordinates?.length){
+        return g.coordinates.map(p => [p[1], p[0]]);
+      }
+    }
+    return [];
+  }
+
+  function addDivisaHotspots(viewer, foto){
+    if (!viewer || !DIVISA) return;
+
+    const key = (foto.titulo || "").trim();
+    const c = (CAL && key && CAL[key]) ? CAL[key] : null;
+    const yawOff = Number(c?.yawOff || 0);
+    const pitchOff = Number(c?.pitchOff || 0);
+
+    // coords da divisa (lat,lng)
+    let coords = extractDivisaCoords(DIVISA);
+    if (!coords.length) return;
+
+    // densifica para parecer uma linha (passo maior em mobile para não pesar)
+    const step = isMobile() ? 10 : 7; // metros
+    coords = densifyLine(coords, step);
+
+    // limite de hotspots pra não travar
+    const MAX = isMobile() ? 450 : 800;
+    if (coords.length > MAX){
+      const stride = Math.ceil(coords.length / MAX);
+      coords = coords.filter((_,i)=> i % stride === 0);
+    }
+
+    for (let i=0;i<coords.length;i++){
+      const [lat2, lon2] = coords[i];
+      const brng = bearingDeg(foto.lat, foto.lng, lat2, lon2);
+      const yaw = bearingToYaw(brng, yawOff);
+      const pitch = pitchOff; // versão simples: “faixa” ajustável no admin
+
+      viewer.addHotSpot({
+        id: "divisa_" + i,
+        pitch: pitch,
+        yaw: yaw,
+        cssClass: "divisa-dot"
+      });
     }
   }
 
@@ -341,18 +572,15 @@
     if (!r.ok) throw new Error("GitHub API não respondeu (HTTP " + r.status + "). Repo está público?");
     const items = await r.json();
 
-    // pega só imagens
     const imgs = items.filter(it =>
-      it.type === "file" &&
-      /\.(jpg|jpeg|png|webp)$/i.test(it.name)
+      it.type === "file" && /\.(jpg|jpeg|png|webp)$/i.test(it.name)
     );
 
-    // ordena pelo nome (você pode mudar a regra)
     imgs.sort((a,b)=> a.name.localeCompare(b.name, "pt-BR", { numeric: true, sensitivity: "base" }));
 
     return imgs.map(it => ({
       name: it.name,
-      url: it.download_url, // url direta (CORS OK)
+      url: it.download_url,
       id: it.sha.slice(0,8)
     }));
   }
@@ -367,7 +595,6 @@
       setStatus(`Lendo EXIF (${i+1}/${files.length})…`);
 
       try{
-        // exifr consegue ler direto de URL na maioria dos casos
         const data = await exifr.gps(f.url);
 
         if (!data || typeof data.latitude !== "number" || typeof data.longitude !== "number"){
@@ -388,7 +615,6 @@
           hfov: 100
         });
       } catch(e){
-        // se falhar em alguma foto, pula
         semGps++;
       }
     }
@@ -404,51 +630,72 @@
     return fotos;
   }
 
+  function fitToFotos(){
+    if (!FOTOS.length) {
+      map.setView([-23.55, -46.63], 12);
+      return;
+    }
+    const latlngs = FOTOS.map(f => [f.lat, f.lng]);
+    const b = L.latLngBounds(latlngs);
+    map.fitBounds(b.pad(0.25));
+  }
+
+  // ================== Marcadores das fotos ==================
+  function makeCameraIcon(){
+    return L.divIcon({
+      className: "",
+      html: `
+        <div class="marker360" aria-label="Foto 360">
+          <div class="pin">
+            <div class="cam">📷</div>
+            <div class="badge">360</div>
+          </div>
+        </div>
+      `,
+      iconSize: [44, 44],
+      iconAnchor: [22, 44]
+    });
+  }
+
   function addFotoMarkers(){
     markersLayer.clearLayers();
-
-    // Ícone mais intuitivo (Foto 360)
-    const foto360Icon = L.divIcon({
-      className: "",
-      html: '<div class="foto360-pin"><span class="foto360-cam">📷</span><span class="foto360-badge">360</span></div>',
-      iconSize: [34, 42],
-      iconAnchor: [17, 36],
-      popupAnchor: [0, -28]
-    });
+    const icon = makeCameraIcon();
 
     FOTOS.forEach(foto => {
-      const m = L.marker([foto.lat, foto.lng], { icon: foto360Icon }).addTo(markersLayer);
+      const m = L.marker([foto.lat, foto.lng], { icon });
 
-      // Tooltip mais “explicativo” para o usuário entender que é clicável
-      m.bindTooltip("📷 360 • " + (foto.titulo || "Abrir"), { direction: "top", offset: [0, -10], opacity: 0.95 });
+      m.bindTooltip("📷 360 • " + (foto.titulo || foto.id), {
+        direction: "top",
+        offset: [0, -10],
+        opacity: 0.95
+      });
 
-      // Clique abre o viewer
       m.on("click", () => openViewer(foto));
+      m.addTo(markersLayer);
     });
 
-    // enquadra
-    if (limitesLayer.getBounds().isValid()){
-      map.fitBounds(limitesLayer.getBounds().pad(0.15));
-    } else {
-      const b = L.latLngBounds(FOTOS.map(f => [f.lat, f.lng]));
-      map.fitBounds(b.pad(0.25));
-    }
+    // se tiver KML, tenta enquadrar por ele; senão pelas fotos
+    const b = limitesLayer.getBounds();
+    if (b.isValid()) map.fitBounds(b.pad(0.15));
+    else fitToFotos();
   }
 
   // ================== INIT ==================
   (async function init(){
     try{
-      setStatus("Listando fotos no GitHub…");
+      setStatus("Listando fotos…");
       const files = await listGithubFolderImages();
-
       if (!files.length) throw new Error(`Nenhuma imagem encontrada em /${FOTOS_DIR}/`);
 
       setStatus(`Encontradas ${files.length} imagens. Lendo GPS…`);
       FOTOS = await buildFotosFromEXIF(files);
 
+      // carrega calibração e KML (se existir)
+      await loadCalibracoes();
       await loadKml();
 
       addFotoMarkers();
+
       hideStatus();
     } catch(e){
       showErr(e.message);
@@ -456,6 +703,5 @@
     }
   })();
 </script>
-
 </body>
 </html>

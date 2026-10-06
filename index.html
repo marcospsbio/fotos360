@@ -1,707 +1,164 @@
 <!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
-  <title>Mapa + Fotos 360</title>
-
-  <!-- Leaflet -->
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+  <meta name="theme-color" content="#101714"/>
+  <title>Sítio Piraju • Mapa e Fotos 360°</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-
-  <!-- Pannellum -->
   <link rel="stylesheet" href="https://unpkg.com/pannellum@2.5.6/build/pannellum.css"/>
-
   <style>
-    html, body { height: 100%; margin: 0; background:#000; font-family: Arial, sans-serif; }
-    #map { height: 100vh; width: 100vw; }
-
-    /* Overlay do 360 */
-    #viewerOverlay { position: fixed; inset: 0; background: #000; display: none; z-index: 9999; }
-    #panorama { width: 100%; height: 100%; }
-
-    /* Mini mapa dentro do 360 */
-    #miniMap {
-      position: absolute;
-      left: 12px;
-      bottom: 12px;
-      width: 110px;         /* ~1/4 do antigo */
-      height: 75px;
-      border-radius: 10px;
-      overflow: hidden;
-      border: 2px solid rgba(255,255,255,0.22);
-      box-shadow: 0 8px 26px rgba(0,0,0,0.45);
-      cursor: pointer;
-      z-index: 10001;
-    }
-    @media (max-width: 900px){
-      #miniMap { width: 90px; height: 60px; left: 10px; bottom: 10px; }
-    }
-
-    #miniHint {
-      position: absolute;
-      left: 12px;
-      bottom: 94px;
-      padding: 7px 9px;
-      background: rgba(0,0,0,0.55);
-      color: #fff;
-      border-radius: 10px;
-      font-size: 11px;
-      user-select: none;
-      z-index: 10001;
-    }
-    @media (max-width: 900px){
-      #miniHint { left: 10px; bottom: 78px; font-size: 10px; }
-    }
-
-    /* Barra superior no 360 */
-    #topBar {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      z-index: 10002;
-      pointer-events: none;
-      flex-wrap: wrap;
-    }
-    .pill {
-      pointer-events: auto;
-      background: rgba(0,0,0,0.55);
-      color: #fff;
-      padding: 9px 11px;
-      border-radius: 999px;
-      font-size: 13px;
-      display: inline-flex;
-      gap: 8px;
-      align-items: center;
-    }
-    .btn {
-      pointer-events: auto;
-      border: 0;
-      border-radius: 999px;
-      padding: 9px 11px;
-      background: rgba(255,255,255,0.10);
-      color: #fff;
-      cursor: pointer;
-    }
-    .btn:hover { background: rgba(255,255,255,0.16); }
-
-    /* Mini galeria */
-    #thumbs {
-      position: absolute;
-      right: 12px;
-      bottom: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      z-index: 10002;
-      max-height: 55vh;
-      overflow: auto;
-      padding-right: 4px;
-    }
-    .thumb {
-      width: 64px; height: 64px;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 2px solid rgba(255,255,255,0.18);
-      cursor: pointer;
-      background: rgba(255,255,255,0.06);
-    }
-    .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-    .thumb.active { border-color: rgba(255,255,255,0.85); }
-
-    /* Status / erro */
-    #status {
-      position: fixed;
-      top: 12px;
-      left: 12px;
-      background: rgba(0,0,0,0.55);
-      color: #fff;
-      padding: 10px 12px;
-      border-radius: 12px;
-      font-size: 13px;
-      z-index: 12000;
-      max-width: calc(100vw - 24px);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    #err {
-      position: fixed; left: 12px; bottom: 12px; right: 12px;
-      background: rgba(0,0,0,0.7); color: #fff;
-      padding: 10px 12px; border-radius: 10px;
-      display: none; z-index: 20000; font-size: 13px;
-    }
-
-    /* Marker "Foto 360" */
-    .marker360 {
-      width: 44px;
-      height: 44px;
-      transform: translate(-22px,-44px);
-      display: grid;
-      place-items: center;
-      pointer-events: auto;
-    }
-    .marker360 .pin {
-      width: 38px; height: 38px;
-      border-radius: 999px;
-      background: rgba(0,0,0,0.70);
-      border: 2px solid rgba(255,255,255,0.30);
-      box-shadow: 0 8px 22px rgba(0,0,0,0.35);
-      display: grid;
-      place-items: center;
-      position: relative;
-    }
-    .marker360 .pin::after{
-      content: "";
-      position: absolute;
-      bottom: -9px;
-      width: 0; height: 0;
-      border-left: 7px solid transparent;
-      border-right: 7px solid transparent;
-      border-top: 10px solid rgba(0,0,0,0.70);
-      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.25));
-    }
-    .marker360 .cam {
-      font-size: 18px;
-      line-height: 1;
-      margin-top: 1px;
-    }
-    .marker360 .badge {
-      position: absolute;
-      top: -6px;
-      right: -6px;
-      font-size: 10px;
-      padding: 3px 6px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.92);
-      color: #000;
-      font-weight: 700;
-      border: 1px solid rgba(0,0,0,0.15);
-    }
-
-    /* “Divisa” dentro do pano (hotspots pontinhos) */
-    .divisa-dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: rgba(255,0,0,0.92);
-      box-shadow: 0 0 10px rgba(255,0,0,0.85);
-      border: 1px solid rgba(255,255,255,0.25);
-    }
+    :root{--panel:rgba(18,25,22,.90);--line:rgba(255,255,255,.14);--txt:#fff;--muted:#cbd5d0;--accent:#d9f99d}
+    *{box-sizing:border-box} html,body,#map{height:100%;margin:0} body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b110e;color:var(--txt)}
+    #map{width:100%}.leaflet-control-layers,.leaflet-bar{border:0!important;box-shadow:0 8px 28px rgba(0,0,0,.22)!important;border-radius:12px!important;overflow:hidden}
+    .brand{position:fixed;z-index:800;left:16px;top:16px;width:min(355px,calc(100vw - 32px));background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:18px;padding:14px 15px;box-shadow:0 16px 44px rgba(0,0,0,.28)}
+    .brand h1{margin:0 0 3px;font-size:18px}.brand p{margin:0;color:var(--muted);font-size:12px;line-height:1.4}.brand .meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.tag{font-size:11px;padding:6px 8px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid var(--line)}
+    .legend{position:fixed;z-index:800;left:16px;bottom:18px;background:var(--panel);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-size:12px;box-shadow:0 12px 36px rgba(0,0,0,.24)}
+    .legend b{display:block;margin-bottom:5px}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#f5f5f5;border:2px solid #111;margin-right:6px;vertical-align:-1px}
+    #viewer{position:fixed;inset:0;z-index:5000;background:#000;display:none}#panorama{position:absolute;inset:0}
+    .viewerbar{position:absolute;z-index:5100;top:max(12px,env(safe-area-inset-top));left:12px;right:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;pointer-events:none}
+    .viewerbar>*{pointer-events:auto}.pill,.btn{border:1px solid rgba(255,255,255,.14);background:rgba(12,16,14,.72);backdrop-filter:blur(12px);color:#fff;border-radius:999px;padding:10px 13px;font-size:12px}.pill{font-weight:700}.btn{cursor:pointer}.btn:hover{background:rgba(255,255,255,.15)}
+    #thumbs{position:absolute;z-index:5100;right:12px;bottom:max(12px,env(safe-area-inset-bottom));display:flex;gap:8px;max-width:calc(100vw - 24px);overflow:auto;padding:4px}
+    .thumb{width:76px;height:52px;flex:0 0 auto;border-radius:11px;overflow:hidden;border:2px solid rgba(255,255,255,.25);background:#111;cursor:pointer;position:relative}.thumb.active{border-color:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.35)}.thumb img{width:100%;height:100%;object-fit:cover}.thumb span{position:absolute;left:5px;right:5px;bottom:4px;font-size:9px;text-shadow:0 1px 4px #000}
+    #miniMap{position:absolute;z-index:5100;left:12px;bottom:max(12px,env(safe-area-inset-bottom));width:150px;height:105px;border-radius:14px;overflow:hidden;border:2px solid rgba(255,255,255,.28);box-shadow:0 10px 30px rgba(0,0,0,.4)}
+    .marker360{width:42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#111;border:2px solid #fff;box-shadow:0 8px 22px rgba(0,0,0,.32);font-size:17px;position:relative}.marker360:after{content:"360";position:absolute;right:-7px;top:-7px;background:#fff;color:#111;font-weight:800;font-size:9px;border-radius:999px;padding:3px 5px}
+    #status{position:fixed;z-index:900;left:50%;top:18px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:8px 12px;font-size:12px;box-shadow:0 8px 28px rgba(0,0,0,.25)}
+    #error{position:fixed;z-index:6000;left:16px;right:16px;bottom:16px;background:#351313;color:#fff;border:1px solid rgba(255,255,255,.15);padding:12px 14px;border-radius:14px;display:none}
+    @media(max-width:720px){.brand{left:10px;top:10px;width:calc(100vw - 70px);padding:11px 12px}.brand h1{font-size:15px}.brand p{font-size:11px}.legend{display:none}#miniMap{width:104px;height:72px}.thumb{width:62px;height:46px}#thumbs{left:124px;right:8px}}
   </style>
 </head>
 <body>
-
 <div id="map"></div>
+<div class="brand">
+  <h1>Sítio Piraju</h1>
+  <p>Visualização técnica da propriedade • imagens panorâmicas 360° e limite cadastral</p>
+  <div class="meta"><span class="tag">360° selecionadas</span><span class="tag">Atualização 2026</span><span class="tag">Mapa híbrido</span></div>
+</div>
+<div class="legend"><b>Visualização</b><span class="dot"></span> Clique nos pontos 360° para explorar</div>
+<div id="status">Carregando mapa…</div><div id="error"></div>
 
-<div id="viewerOverlay">
+<div id="viewer">
   <div id="panorama"></div>
-
-  <div id="topBar">
-    <div class="pill" id="viewerTitle">Foto 360</div>
-    <button class="btn" id="btnClose">Voltar ao mapa</button>
-    <button class="btn" id="btnFullscreen">Tela cheia</button>
+  <div class="viewerbar">
+    <span class="pill" id="viewerTitle">Foto 360°</span>
+    <button class="btn" id="backBtn">← Voltar ao mapa</button>
+    <button class="btn" id="fullBtn">Tela cheia</button>
   </div>
-
-  <div id="miniHint">Toque no mini‑mapa para voltar</div>
-  <div id="miniMap" title="Clique para voltar ao mapa"></div>
-
+  <div id="miniMap"></div>
   <div id="thumbs"></div>
 </div>
 
-<div id="status">Carregando…</div>
-<div id="err"></div>
-
-<!-- libs -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/pannellum@2.5.6/build/pannellum.js"></script>
-
-<!-- EXIF no navegador (GPS etc.) -->
 <script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
-
-<!-- KML -> GeoJSON -->
 <script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
-
 <script>
-  // ================== CONFIG ==================
-  const GITHUB_OWNER = "marcospsbio";
-  const GITHUB_REPO  = "fotos360";
-  const BRANCH       = "main";
-  const FOTOS_DIR    = "fotos";
+const OWNER="marcospsbio", REPO="fotos360", BRANCH="main", FOTOS_DIR="fotos";
+const KML_URL="./property.kml";
 
-  // arquivos opcionais na raiz do repo:
-  // - property.kml (limites)
-  // - calibracoes.json (offset por foto: yawOff/pitchOff/altura)
-  const KML_URL = "./property.kml";
-  const CAL_URL = "./calibracoes.json";
+/* Somente estas panorâmicas são publicadas. */
+const SELECAO=[
+  {arquivo:"DJI_0210.JPG", titulo:"Vista aérea 360°", grupo:"Visão geral"},
+  {arquivo:"IMG_20250111_223057_00_631.jpg", titulo:"Panorâmica original", grupo:"Propriedade"},
+  {arquivo:"lago_01.jpg", titulo:"Lago • margem 1", grupo:"Lago"},
+  {arquivo:"lago_02.jpg", titulo:"Lago • margem 2", grupo:"Lago"},
+  {arquivo:"lago_03.jpg", titulo:"Lago • acesso/margem", grupo:"Lago"}
+];
 
-  // ================== UI helpers ==================
-  const errBox = document.getElementById("err");
-  const statusBox = document.getElementById("status");
+const statusEl=document.getElementById("status"), errEl=document.getElementById("error");
+function status(t){statusEl.textContent=t} function hideStatus(){statusEl.style.display="none"}
+function error(t){errEl.textContent=t;errEl.style.display="block";setTimeout(()=>errEl.style.display="none",7000)}
 
-  function showErr(msg){
-    errBox.textContent = msg;
-    errBox.style.display = "block";
-    setTimeout(()=> errBox.style.display = "none", 6500);
-  }
-  function setStatus(msg){ statusBox.textContent = msg; }
-  function hideStatus(){ statusBox.style.display = "none"; }
-  function isMobile(){ return matchMedia("(max-width: 900px)").matches; }
+const map=L.map("map",{zoomControl:false,preferCanvas:true});
+L.control.zoom({position:"bottomright"}).addTo(map);
+const sat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,attribution:"Esri"});
+const labels=L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:20,attribution:"Esri"});
+const hybrid=L.layerGroup([sat,labels]).addTo(map);
+const osm=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:20,attribution:"© OpenStreetMap"});
+L.control.layers({"Satélite híbrido":hybrid,"Mapa":osm},null,{position:"topright"}).addTo(map);
 
-  // ================== MAPA PRINCIPAL ==================
-  const map = L.map("map", { zoomControl: true });
+const limite=L.geoJSON(null,{style:{color:"#f8fafc",weight:3,opacity:.95,fillColor:"#d9f99d",fillOpacity:.05}}).addTo(map);
+const markers=L.layerGroup().addTo(map);
 
-  // Base layers
-  const osmMain = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 20, attribution: "&copy; OpenStreetMap"
-  });
+const mini=L.map("miniMap",{zoomControl:false,attributionControl:false,dragging:false,scrollWheelZoom:false,doubleClickZoom:false,boxZoom:false,keyboard:false});
+const miniSat=L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{maxZoom:20}).addTo(mini);
+const miniLabels=L.tileLayer("https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",{maxZoom:20}).addTo(mini);
+const miniLimite=L.geoJSON(null,{style:{color:"#fff",weight:2,fillOpacity:0}}).addTo(mini);
+let miniMarker=null, viewer=null, fotos=[], current=null;
 
-  const esriSatMain = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    { maxZoom: 20, attribution: "Tiles &copy; Esri" }
-  );
+function cameraIcon(){return L.divIcon({className:"",html:'<div class="marker360">📷</div>',iconSize:[42,42],iconAnchor:[21,21]})}
 
-  // Inicia já no satélite
-  esriSatMain.addTo(map);
+async function loadKml(){
+  try{
+    const r=await fetch(KML_URL,{cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status);
+    const xml=new DOMParser().parseFromString(await r.text(),"text/xml");
+    const gj=toGeoJSON.kml(xml); limite.addData(gj); miniLimite.addData(gj);
+  }catch(e){error("Limite da propriedade: "+e.message)}
+}
 
-  L.control.layers(
-    { "Satélite": esriSatMain, "Mapa": osmMain },
-    {},
-    { position: "topright" }
-  ).addTo(map);
-
-  const limitesLayer = L.geoJSON(null, {
-    style: { weight: 3, opacity: 0.95, fillOpacity: 0.05 }
-  }).addTo(map);
-
-  const markersLayer = L.layerGroup().addTo(map);
-
-  // ================== MINI MAPA (também satélite) ==================
-  const miniMap = L.map("miniMap", {
-    zoomControl: false,
-    attributionControl: false,
-    dragging: false,
-    scrollWheelZoom: false,
-    doubleClickZoom: false,
-    boxZoom: false,
-    keyboard: false,
-    tap: false
-  });
-
-  const esriSatMini = L.tileLayer(
-    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    { maxZoom: 20, attribution: "Tiles &copy; Esri" }
-  ).addTo(miniMap);
-
-  const miniLimitesLayer = L.geoJSON(null, {
-    style: { weight: 2, opacity: 0.95, fillOpacity: 0.05 }
-  }).addTo(miniMap);
-
-  let miniMarker = null;
-
-  // ================== VIEWER 360 ==================
-  const overlay = document.getElementById("viewerOverlay");
-  const viewerTitle = document.getElementById("viewerTitle");
-  const btnClose = document.getElementById("btnClose");
-  const btnFullscreen = document.getElementById("btnFullscreen");
-  const thumbsEl = document.getElementById("thumbs");
-
-  let viewer = null;
-  let currentFotoId = null;
-
-  // fotos montadas automaticamente
-  let FOTOS = [];
-
-  // divisa / calibração
-  let DIVISA = null; // GeoJSON
-  let CAL = {};      // { "arquivo.jpg": {yawOff, pitchOff, altura, ...} }
-
-  function openViewer(foto){
-    currentFotoId = foto.id;
-    viewerTitle.textContent = "📷 360 • " + (foto.titulo || foto.id);
-    overlay.style.display = "block";
-
-    // (Re)cria o viewer
-    if (viewer) {
-      try { viewer.destroy(); } catch(e) {}
-      viewer = null;
-      document.getElementById("panorama").innerHTML = "";
-    }
-
-    const hfovInicial = foto.hfov ?? (isMobile() ? 105 : 100);
-
-    viewer = pannellum.viewer('panorama', {
-      type: 'equirectangular',
-      panorama: foto.url,
-      autoLoad: true,
-      showZoomCtrl: true,
-      showFullscreenCtrl: false,
-      mouseZoom: true,
-
-      // zoom bem livre (mobile)
-      hfov: hfovInicial,
-      minHfov: 3,
-      maxHfov: 170,
-
-      yaw: 0,
-      pitch: 0
-    });
-
-    // aplica calibração (se existir)
-    applyCalibracao(viewer, foto);
-
-    // adiciona divisa sobre o pano (pontos)
-    addDivisaHotspots(viewer, foto);
-
-    // Atualiza mini-mapa e thumbs
-    updateMiniMap(foto);
-    renderThumbs();
-  }
-
-  function closeViewer(){
-    overlay.style.display = "none";
-  }
-
-  btnClose.addEventListener("click", closeViewer);
-
-  btnFullscreen.addEventListener("click", () => {
-    const el = overlay;
-    if (!document.fullscreenElement) el.requestFullscreen?.();
-    else document.exitFullscreen?.();
-  });
-
-  document.getElementById("miniMap").addEventListener("click", closeViewer);
-
-  function updateMiniMap(foto){
-    if (miniMarker) {
-      miniMap.removeLayer(miniMarker);
-      miniMarker = null;
-    }
-
-    miniMarker = L.circleMarker([foto.lat, foto.lng], {
-      radius: 6,
-      weight: 2,
-      opacity: 1,
-      fillOpacity: 0.9
-    }).addTo(miniMap);
-
-    const bounds = miniLimitesLayer.getBounds();
-    if (bounds.isValid()) {
-      const combined = bounds.extend([foto.lat, foto.lng]);
-      miniMap.fitBounds(combined.pad(0.15));
-    } else {
-      miniMap.setView([foto.lat, foto.lng], 18);
-    }
-  }
-
-  function renderThumbs(){
-    thumbsEl.innerHTML = "";
-    FOTOS.forEach(f => {
-      const d = document.createElement("div");
-      d.className = "thumb" + (f.id === currentFotoId ? " active" : "");
-      const img = document.createElement("img");
-      img.src = f.thumb || f.url;
-      img.alt = f.titulo || f.id;
-      d.appendChild(img);
-      d.addEventListener("click", () => openViewer(f));
-      thumbsEl.appendChild(d);
-    });
-  }
-
-  // ================== KML (limites) ==================
-  async function loadKml(){
+async function listSelected(){
+  const api=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FOTOS_DIR}?ref=${BRANCH}`;
+  const r=await fetch(api,{cache:"no-store"}); if(!r.ok) throw new Error("Não foi possível listar as imagens.");
+  const all=await r.json(), byName=Object.fromEntries(all.filter(x=>x.type==="file").map(x=>[x.name,x]));
+  const out=[];
+  for(const s of SELECAO){
+    const f=byName[s.arquivo]; if(!f){console.warn("Aguardando arquivo:",s.arquivo);continue}
     try{
-      const resp = await fetch(KML_URL, { cache: "no-store" });
-      if (!resp.ok) throw new Error("Não consegui baixar property.kml (HTTP " + resp.status + ")");
-      const text = await resp.text();
-      const parser = new DOMParser();
-      const xml = parser.parseFromString(text, "text/xml");
-
-      DIVISA = toGeoJSON.kml(xml); // guarda para uso no 360
-
-      limitesLayer.clearLayers();
-      limitesLayer.addData(DIVISA);
-
-      miniLimitesLayer.clearLayers();
-      miniLimitesLayer.addData(DIVISA);
-
-      const b = limitesLayer.getBounds();
-      if (b.isValid()) map.fitBounds(b.pad(0.15));
-    } catch(e){
-      DIVISA = null;
-      showErr("KML: " + e.message);
-    }
+      const gps=await exifr.gps(f.download_url);
+      if(!gps||typeof gps.latitude!=="number"||typeof gps.longitude!=="number") continue;
+      out.push({...s,id:f.sha.slice(0,8),url:f.download_url,thumb:f.download_url,lat:gps.latitude,lng:gps.longitude});
+    }catch(e){console.warn(s.arquivo,e)}
   }
+  return out;
+}
 
-  // ================== Calibrações ==================
-  async function loadCalibracoes(){
-    try{
-      const r = await fetch(CAL_URL, { cache: "no-store" });
-      if (r.ok) CAL = await r.json();
-    } catch(e){
-      CAL = {};
-    }
-  }
+function addMarkers(){
+  markers.clearLayers();
+  fotos.forEach(f=>{
+    const m=L.marker([f.lat,f.lng],{icon:cameraIcon(),riseOnHover:true});
+    m.bindTooltip(`<b>${f.titulo}</b><br>${f.grupo}`,{direction:"top",offset:[0,-14],opacity:.96});
+    m.on("click",()=>openViewer(f)); m.addTo(markers);
+  });
+  const b=limite.getBounds();
+  if(b.isValid()) map.fitBounds(b.pad(.08),{maxZoom:18});
+  else if(fotos.length) map.fitBounds(L.latLngBounds(fotos.map(f=>[f.lat,f.lng])).pad(.2));
+}
 
-  function applyCalibracao(viewer, foto){
-    // chave principal: nome do arquivo (foto.titulo)
-    const key = (foto.titulo || "").trim();
-    const c = (CAL && key && CAL[key]) ? CAL[key] : null;
-    if (!c) return;
+function openViewer(f){
+  current=f; document.getElementById("viewer").style.display="block";
+  document.getElementById("viewerTitle").textContent=`${f.titulo} • ${f.grupo}`;
+  if(viewer){try{viewer.destroy()}catch(e){} document.getElementById("panorama").innerHTML=""}
+  viewer=pannellum.viewer("panorama",{type:"equirectangular",panorama:f.url,autoLoad:true,showZoomCtrl:true,showFullscreenCtrl:false,hfov:100,minHfov:25,maxHfov:150});
+  if(miniMarker) mini.removeLayer(miniMarker);
+  miniMarker=L.circleMarker([f.lat,f.lng],{radius:7,color:"#111",weight:2,fillColor:"#fff",fillOpacity:1}).addTo(mini);
+  const b=miniLimite.getBounds(); b.isValid()?mini.fitBounds(b.pad(.08)):mini.setView([f.lat,f.lng],18);
+  setTimeout(()=>mini.invalidateSize(),100);
+  renderThumbs();
+}
+function closeViewer(){document.getElementById("viewer").style.display="none"}
+document.getElementById("backBtn").onclick=closeViewer;
+document.getElementById("miniMap").onclick=closeViewer;
+document.getElementById("fullBtn").onclick=()=>!document.fullscreenElement?document.getElementById("viewer").requestFullscreen?.():document.exitFullscreen?.();
 
-    const yawOff = Number(c.yawOff || 0);
-    const pitchOff = Number(c.pitchOff || 0);
-    // altura existe mas, nesta versão simples, não entra no cálculo do pitch real do KML
-    viewer.setYaw(yawOff);
-    viewer.setPitch(pitchOff);
-  }
+function renderThumbs(){
+  const el=document.getElementById("thumbs"); el.innerHTML="";
+  fotos.forEach(f=>{
+    const d=document.createElement("div"); d.className="thumb"+(current&&current.id===f.id?" active":"");
+    d.innerHTML=`<img src="${f.thumb}" alt=""><span>${f.titulo}</span>`;
+    d.onclick=()=>openViewer(f); el.appendChild(d);
+  });
+}
 
-  // ================== Overlay da divisa no 360 ==================
-  function bearingDeg(lat1, lon1, lat2, lon2){
-    const toRad = d => d * Math.PI/180;
-    const toDeg = r => r * 180/Math.PI;
-    const φ1 = toRad(lat1), φ2 = toRad(lat2);
-    const Δλ = toRad(lon2 - lon1);
-    const y = Math.sin(Δλ) * Math.cos(φ2);
-    const x = Math.cos(φ1)*Math.sin(φ2) - Math.sin(φ1)*Math.cos(φ2)*Math.cos(Δλ);
-    let brng = toDeg(Math.atan2(y, x));
-    brng = (brng + 360) % 360;
-    return brng;
-  }
-
-  function normalizeYaw(yaw){
-    // [-180..180]
-    return ((yaw + 540) % 360) - 180;
-  }
-
-  function bearingToYaw(bearing, yawOff){
-    // yawOff é o ajuste manual (admin) para "alinhar" o norte do pano
-    return normalizeYaw(bearing + (yawOff || 0));
-  }
-
-  function haversineMeters(lat1, lon1, lat2, lon2){
-    const R = 6371000;
-    const toRad = d => d*Math.PI/180;
-    const φ1=toRad(lat1), φ2=toRad(lat2);
-    const dφ=toRad(lat2-lat1), dλ=toRad(lon2-lon1);
-    const a = Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2;
-    return 2*R*Math.asin(Math.sqrt(a));
-  }
-
-  function densifyLine(latlngs, stepMeters){
-    // latlngs: [[lat,lng], ...]
-    if (latlngs.length < 2) return latlngs;
-    const out = [latlngs[0]];
-    for (let i=0;i<latlngs.length-1;i++){
-      const [lat1, lon1] = latlngs[i];
-      const [lat2, lon2] = latlngs[i+1];
-      const dist = haversineMeters(lat1, lon1, lat2, lon2);
-      const n = Math.max(1, Math.floor(dist / stepMeters));
-      for (let k=1;k<=n;k++){
-        const t = k / n;
-        out.push([lat1 + (lat2-lat1)*t, lon1 + (lon2-lon1)*t]);
-      }
-    }
-    return out;
-  }
-
-  function extractDivisaCoords(divisaGeoJson){
-    if (!divisaGeoJson || !divisaGeoJson.features) return [];
-    for (const f of divisaGeoJson.features){
-      const g = f.geometry;
-      if (!g) continue;
-      if (g.type === "Polygon" && g.coordinates?.[0]?.length){
-        // anel externo: [[lon,lat],...]
-        return g.coordinates[0].map(p => [p[1], p[0]]);
-      }
-      if (g.type === "MultiPolygon" && g.coordinates?.[0]?.[0]?.length){
-        return g.coordinates[0][0].map(p => [p[1], p[0]]);
-      }
-      if (g.type === "LineString" && g.coordinates?.length){
-        return g.coordinates.map(p => [p[1], p[0]]);
-      }
-    }
-    return [];
-  }
-
-  function addDivisaHotspots(viewer, foto){
-    if (!viewer || !DIVISA) return;
-
-    const key = (foto.titulo || "").trim();
-    const c = (CAL && key && CAL[key]) ? CAL[key] : null;
-    const yawOff = Number(c?.yawOff || 0);
-    const pitchOff = Number(c?.pitchOff || 0);
-
-    // coords da divisa (lat,lng)
-    let coords = extractDivisaCoords(DIVISA);
-    if (!coords.length) return;
-
-    // densifica para parecer uma linha (passo maior em mobile para não pesar)
-    const step = isMobile() ? 10 : 7; // metros
-    coords = densifyLine(coords, step);
-
-    // limite de hotspots pra não travar
-    const MAX = isMobile() ? 450 : 800;
-    if (coords.length > MAX){
-      const stride = Math.ceil(coords.length / MAX);
-      coords = coords.filter((_,i)=> i % stride === 0);
-    }
-
-    for (let i=0;i<coords.length;i++){
-      const [lat2, lon2] = coords[i];
-      const brng = bearingDeg(foto.lat, foto.lng, lat2, lon2);
-      const yaw = bearingToYaw(brng, yawOff);
-      const pitch = pitchOff; // versão simples: “faixa” ajustável no admin
-
-      viewer.addHotSpot({
-        id: "divisa_" + i,
-        pitch: pitch,
-        yaw: yaw,
-        cssClass: "divisa-dot"
-      });
-    }
-  }
-
-  // ================== AUTO: listar pasta /fotos/ no GitHub ==================
-  async function listGithubFolderImages(){
-    const api = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${FOTOS_DIR}?ref=${BRANCH}`;
-    const r = await fetch(api, { cache: "no-store" });
-    if (!r.ok) throw new Error("GitHub API não respondeu (HTTP " + r.status + "). Repo está público?");
-    const items = await r.json();
-
-    const imgs = items.filter(it =>
-      it.type === "file" && /\.(jpg|jpeg|png|webp)$/i.test(it.name)
-    );
-
-    imgs.sort((a,b)=> a.name.localeCompare(b.name, "pt-BR", { numeric: true, sensitivity: "base" }));
-
-    return imgs.map(it => ({
-      name: it.name,
-      url: it.download_url,
-      id: it.sha.slice(0,8)
-    }));
-  }
-
-  // ================== AUTO: ler EXIF (GPS) ==================
-  async function buildFotosFromEXIF(files){
-    const fotos = [];
-    let ok = 0, semGps = 0;
-
-    for (let i=0; i<files.length; i++){
-      const f = files[i];
-      setStatus(`Lendo EXIF (${i+1}/${files.length})…`);
-
-      try{
-        const data = await exifr.gps(f.url);
-
-        if (!data || typeof data.latitude !== "number" || typeof data.longitude !== "number"){
-          semGps++;
-          continue;
-        }
-
-        ok++;
-        fotos.push({
-          id: f.id,
-          titulo: f.name,
-          url: f.url,
-          thumb: f.url,
-          lat: data.latitude,
-          lng: data.longitude,
-          yaw: 0,
-          pitch: 0,
-          hfov: 100
-        });
-      } catch(e){
-        semGps++;
-      }
-    }
-
-    if (ok === 0){
-      throw new Error("Nenhuma foto com GPS no EXIF foi encontrada. As fotos precisam ter coordenadas embutidas.");
-    }
-
-    if (semGps > 0){
-      showErr(`${semGps} foto(s) sem GPS no EXIF foram ignoradas.`);
-    }
-
-    return fotos;
-  }
-
-  function fitToFotos(){
-    if (!FOTOS.length) {
-      map.setView([-23.55, -46.63], 12);
-      return;
-    }
-    const latlngs = FOTOS.map(f => [f.lat, f.lng]);
-    const b = L.latLngBounds(latlngs);
-    map.fitBounds(b.pad(0.25));
-  }
-
-  // ================== Marcadores das fotos ==================
-  function makeCameraIcon(){
-    return L.divIcon({
-      className: "",
-      html: `
-        <div class="marker360" aria-label="Foto 360">
-          <div class="pin">
-            <div class="cam">📷</div>
-            <div class="badge">360</div>
-          </div>
-        </div>
-      `,
-      iconSize: [44, 44],
-      iconAnchor: [22, 44]
-    });
-  }
-
-  function addFotoMarkers(){
-    markersLayer.clearLayers();
-    const icon = makeCameraIcon();
-
-    FOTOS.forEach(foto => {
-      const m = L.marker([foto.lat, foto.lng], { icon });
-
-      m.bindTooltip("📷 360 • " + (foto.titulo || foto.id), {
-        direction: "top",
-        offset: [0, -10],
-        opacity: 0.95
-      });
-
-      m.on("click", () => openViewer(foto));
-      m.addTo(markersLayer);
-    });
-
-    // se tiver KML, tenta enquadrar por ele; senão pelas fotos
-    const b = limitesLayer.getBounds();
-    if (b.isValid()) map.fitBounds(b.pad(0.15));
-    else fitToFotos();
-  }
-
-  // ================== INIT ==================
-  (async function init(){
-    try{
-      setStatus("Listando fotos…");
-      const files = await listGithubFolderImages();
-      if (!files.length) throw new Error(`Nenhuma imagem encontrada em /${FOTOS_DIR}/`);
-
-      setStatus(`Encontradas ${files.length} imagens. Lendo GPS…`);
-      FOTOS = await buildFotosFromEXIF(files);
-
-      // carrega calibração e KML (se existir)
-      await loadCalibracoes();
-      await loadKml();
-
-      addFotoMarkers();
-
-      hideStatus();
-    } catch(e){
-      showErr(e.message);
-      setStatus("Erro. Veja a mensagem abaixo.");
-    }
-  })();
+(async()=>{
+  try{
+    await loadKml();
+    status("Carregando panorâmicas selecionadas…");
+    fotos=await listSelected();
+    addMarkers();
+    if(!fotos.length) throw new Error("Nenhuma panorâmica selecionada está disponível.");
+    hideStatus();
+  }catch(e){status("Erro ao carregar");error(e.message)}
+})();
 </script>
 </body>
 </html>

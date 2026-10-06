@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#101714"/>
   <title>Sítio Piraju • Mapa e Fotos 360°</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/pannellum@2.5.6/build/pannellum.css"/>
+  <link rel="stylesheet" href="./pannellum/pannellum.css"/>
   <style>
     :root{--panel:rgba(18,25,22,.90);--line:rgba(255,255,255,.14);--txt:#fff;--muted:#cbd5d0;--accent:#d9f99d}
     *{box-sizing:border-box} html,body,#map{height:100%;margin:0} body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0b110e;color:var(--txt)}
@@ -49,20 +49,17 @@
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/pannellum@2.5.6/build/pannellum.js"></script>
-<script src="https://unpkg.com/exifr/dist/lite.umd.js"></script>
-<script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
+<script src="./pannellum/pannellum.js"></script>
 <script>
-const OWNER="marcospsbio", REPO="fotos360", BRANCH="main", FOTOS_DIR="fotos";
 const KML_URL="./property.kml";
 
-/* Somente estas panorâmicas são publicadas. */
+/* Seleção fixa: sem consulta à API do GitHub e sem leitura EXIF no navegador. */
 const SELECAO=[
-  {arquivo:"DJI_0210.JPG", titulo:"Vista aérea 360°", grupo:"Visão geral"},
-  {arquivo:"IMG_20250111_223057_00_631.jpg", titulo:"Panorâmica original", grupo:"Propriedade"},
-  {arquivo:"lago_01.jpg", titulo:"Lago • margem 1", grupo:"Lago"},
-  {arquivo:"lago_02.jpg", titulo:"Lago • margem 2", grupo:"Lago"},
-  {arquivo:"lago_03.jpg", titulo:"Lago • acesso/margem", grupo:"Lago"}
+  {arquivo:"DJI_0210.JPG", titulo:"Vista aérea 360°", grupo:"Visão geral", lat:-23.33307725, lng:-47.39922611111111},
+  {arquivo:"IMG_20250111_223057_00_631.jpg", titulo:"Panorâmica original", grupo:"Propriedade", lat:-23.33297222222222, lng:-47.397444444444446},
+  {arquivo:"lago_01.jpg", titulo:"Lago • margem 1", grupo:"Lago", lat:-23.333888888888886, lng:-47.399277777777776},
+  {arquivo:"lago_02.jpg", titulo:"Lago • margem 2", grupo:"Lago", lat:-23.33363888888889, lng:-47.39958333333333},
+  {arquivo:"lago_03.jpg", titulo:"Lago • acesso/margem", grupo:"Lago", lat:-23.333222222222222, lng:-47.39986111111111}
 ];
 
 const statusEl=document.getElementById("status"), errEl=document.getElementById("error");
@@ -92,24 +89,25 @@ async function loadKml(){
   try{
     const r=await fetch(KML_URL,{cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status);
     const xml=new DOMParser().parseFromString(await r.text(),"text/xml");
-    const gj=toGeoJSON.kml(xml); limite.addData(gj); miniLimite.addData(gj);
+    const nodes=[...xml.getElementsByTagName("coordinates")];
+    const rings=nodes.map(n=>n.textContent.trim().split(/\s+/).map(v=>{
+      const p=v.split(",").map(Number); return [p[0],p[1]];
+    }).filter(p=>Number.isFinite(p[0])&&Number.isFinite(p[1]))).filter(a=>a.length>=3);
+    if(!rings.length) throw new Error("coordenadas não encontradas no KML");
+    const ring=rings.sort((a,b)=>b.length-a.length)[0];
+    if(ring[0][0]!==ring[ring.length-1][0] || ring[0][1]!==ring[ring.length-1][1]) ring.push([...ring[0]]);
+    const gj={type:"Feature",properties:{name:"Limite da propriedade"},geometry:{type:"Polygon",coordinates:[ring]}};
+    limite.addData(gj); miniLimite.addData(gj);
   }catch(e){error("Limite da propriedade: "+e.message)}
 }
 
 async function listSelected(){
-  const api=`https://api.github.com/repos/${OWNER}/${REPO}/contents/${FOTOS_DIR}?ref=${BRANCH}`;
-  const r=await fetch(api,{cache:"no-store"}); if(!r.ok) throw new Error("Não foi possível listar as imagens.");
-  const all=await r.json(), byName=Object.fromEntries(all.filter(x=>x.type==="file").map(x=>[x.name,x]));
-  const out=[];
-  for(const s of SELECAO){
-    const f=byName[s.arquivo]; if(!f){console.warn("Aguardando arquivo:",s.arquivo);continue}
-    try{
-      const gps=await exifr.gps(f.download_url);
-      if(!gps||typeof gps.latitude!=="number"||typeof gps.longitude!=="number") continue;
-      out.push({...s,id:f.sha.slice(0,8),url:f.download_url,thumb:f.download_url,lat:gps.latitude,lng:gps.longitude});
-    }catch(e){console.warn(s.arquivo,e)}
-  }
-  return out;
+  return SELECAO.map((s,i)=>({
+    ...s,
+    id:"foto_"+(i+1),
+    url:"./fotos/"+encodeURIComponent(s.arquivo),
+    thumb:"./fotos/"+encodeURIComponent(s.arquivo)
+  }));
 }
 
 function addMarkers(){
